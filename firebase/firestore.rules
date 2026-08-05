@@ -56,6 +56,26 @@ service cloud.firestore {
       allow delete: if false; // soft-delete only — set deletedAt field instead
     }
 
+    // notes/{noteId}
+    // Each user can only read and write their own notes. Hard-delete is
+    // disabled — deleteNote() sets deletedAt instead (see notes() action).
+    match /notes/{noteId} {
+      // Direct equality checks (not notDeleted()'s OR-based check) so this
+      // rule is provable against the useNotes() query's where() filters —
+      // list rules must be statically verifiable from the query alone.
+      allow read: if isAuthenticated() && isOwner(resource.data.uid) && resource.data.deletedAt == null;
+
+      allow create: if isAuthenticated() && isOwner(request.resource.data.uid)
+        && request.resource.data.keys().hasAll(['uid', 'title', 'body', 'createdAt', 'updatedAt', 'deletedAt', '_schemaVersion'])
+        && request.resource.data.keys().hasOnly(['uid', 'title', 'body', 'createdAt', 'updatedAt', 'deletedAt', '_schemaVersion']);
+
+      allow update: if isAuthenticated() && isOwner(resource.data.uid)
+        && request.resource.data.uid == resource.data.uid  // uid is immutable
+        && request.resource.data.keys().hasOnly(['uid', 'title', 'body', 'createdAt', 'updatedAt', 'deletedAt', '_schemaVersion']);
+
+      allow delete: if false; // soft-delete only — set deletedAt field instead
+    }
+
     // Add new collection rules above this comment using the /firebase-collection skill.
 
     // ── Default deny ───────────────────────────────────────────────────────
